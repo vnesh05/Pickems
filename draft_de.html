@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Double Elimination Bracket — Masters Toronto</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: 'Orbitron', sans-serif;
+      margin: 0;
+      padding: 30px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2em;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    #bracket-container {
+      display: flex;
+      flex-direction: column;
+      gap: 50px;
+    }
+    .bracket-section {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+    }
+    /* Vertically center columns inside upper bracket section */
+    #upper-bracket {
+      align-items: center;
+      min-height: 50vh;
+    }
+    .column {
+      background: linear-gradient(135deg, #1a1a1a, #222);
+      padding: 20px;
+      clip-path: polygon(0 0, 100% 5%, 100% 95%, 0 100%);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 1px solid #444;
+    }
+    .column h2 {
+      margin-bottom: 20px;
+      border-bottom: 2px solid #555;
+      padding-bottom: 6px;
+      width: 100%;
+      text-align: center;
+      color: #ddd;
+      font-size: 1.2em;
+      text-transform: uppercase;
+    }
+    .match {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      margin-bottom: 12px;
+      background: #1e1e1e;
+      clip-path: polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+      border: 1px solid #444;
+      padding: 10px;
+      gap: 4px;
+    }
+    .match span {
+      text-align: center;
+      padding: 8px 10px;
+      background: #2b2b2b;
+      color: #ccc;
+      clip-path: polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.95em;
+      user-select: none;
+    }
+    .match span:hover {
+      background: #555;
+      color: #fff;
+    }
+    .winner {
+      background: #0f0 !important;
+      color: #000 !important;
+      cursor: default;
+    }
+    .loser {
+      background: #900 !important;
+      color: #fff !important;
+      cursor: default;
+    }
+    .disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    button {
+      margin-top: 30px;
+      font-size: 1em;
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #0f0;
+      border: none;
+      border-radius: 5px;
+      font-weight: 700;
+      color: #000;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Double Elimination Bracket — Masters Toronto</h1>
+<br>
+<div id="bracket-container">
+  <div class="bracket-section" id="upper-bracket">
+    <div class="column" id="col-UR1"><h2>Upper R1</h2></div>
+    <div class="column" id="col-UR2"><h2>Upper R2</h2></div>
+    <div class="column" id="col-UR3"><h2>Upper Final</h2></div>
+    <div class="column" id="col-GF"><h2>Grand Final</h2></div>
+  </div>
+
+  <div class="bracket-section" id="lower-bracket">
+    <div class="column" id="col-LR1"><h2>Lower R1</h2></div>
+    <div class="column" id="col-LR2"><h2>Lower R2</h2></div>
+    <div class="column" id="col-LR3"><h2>Lower R3</h2></div>
+    <div class="column" id="col-LR4"><h2>Lower Final</h2></div>
+  </div>
+</div>
+
+<button id="reset">Reset Bracket</button>
+
+<script>
+  let swiss = JSON.parse(localStorage.getItem("qualifiedTeams") || "[]");
+  let invited = ["G2", "RRQ", "XLG", "FNATIC"];
+  if (swiss.length < 4) swiss = ["TeamA", "TeamB", "TeamC", "TeamD"];
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  shuffle(invited);
+  shuffle(swiss);
+
+  let teams = [];
+  for (let i = 0; i < 4; i++) {
+    teams.push({ name: invited[i], id: `inv${i}` });
+    teams.push({ name: swiss[i], id: `swiss${i}` });
+  }
+
+  const TBD = { name: "TBD", id: "TBD" };
+
+  let UR1 = [
+    { playerA: teams[0], playerB: teams[1], played: false },
+    { playerA: teams[2], playerB: teams[3], played: false },
+    { playerA: teams[4], playerB: teams[5], played: false },
+    { playerA: teams[6], playerB: teams[7], played: false }
+  ];
+  let UR2 = [{ playerA: TBD, playerB: TBD }, { playerA: TBD, playerB: TBD }];
+  let UR3 = [{ playerA: TBD, playerB: TBD }];
+  let GF = [{ playerA: TBD, playerB: TBD }];
+  let LR1 = [{ playerA: TBD, playerB: TBD }, { playerA: TBD, playerB: TBD }];
+  let LR2 = [{ playerA: TBD, playerB: TBD }, { playerA: TBD, playerB: TBD }];
+  let LR3 = [{ playerA: TBD, playerB: TBD }];
+  let LR4 = [{ playerA: TBD, playerB: TBD }];
+
+  function createMatchElement(match) {
+    const div = document.createElement("div");
+    div.className = "match";
+    const sA = document.createElement("span");
+    const sB = document.createElement("span");
+    sA.textContent = match.playerA.name;
+    sB.textContent = match.playerB.name;
+
+    if (match.played) {
+      sA.className = match.winner === match.playerA ? "winner" : "loser";
+      sB.className = match.winner === match.playerB ? "winner" : "loser";
+    } else if (match.playerA.id !== "TBD" && match.playerB.id !== "TBD") {
+      sA.onclick = () => decideWinner(match, match.playerA);
+      sB.onclick = () => decideWinner(match, match.playerB);
+    } else {
+      div.classList.add("disabled");
+    }
+
+    div.append(sA, sB);
+    return div;
+  }
+
+  function decideWinner(match, winner) {
+    if (match.played) return;
+    match.played = true;
+    match.winner = winner;
+    buildNextRounds();
+    render();
+  }
+
+  function buildNextRounds() {
+    const getWinner = (m) => m.played ? m.winner : TBD;
+    const getLoser = (m) => m.played ? (m.winner === m.playerA ? m.playerB : m.playerA) : TBD;
+
+    UR2[0].playerA = getWinner(UR1[0]);
+    UR2[0].playerB = getWinner(UR1[1]);
+    UR2[1].playerA = getWinner(UR1[2]);
+    UR2[1].playerB = getWinner(UR1[3]);
+
+    UR3[0].playerA = getWinner(UR2[0]);
+    UR3[0].playerB = getWinner(UR2[1]);
+
+    LR1[0].playerA = getLoser(UR1[0]);
+    LR1[0].playerB = getLoser(UR1[1]);
+    LR1[1].playerA = getLoser(UR1[2]);
+    LR1[1].playerB = getLoser(UR1[3]);
+
+    LR2[0].playerA = getWinner(LR1[0]);
+    LR2[0].playerB = getLoser(UR2[0]);
+    LR2[1].playerA = getWinner(LR1[1]);
+    LR2[1].playerB = getLoser(UR2[1]);
+
+    LR3[0].playerA = getWinner(LR2[0]);
+    LR3[0].playerB = getWinner(LR2[1]);
+
+    LR4[0].playerA = getWinner(LR3[0]);
+    LR4[0].playerB = getLoser(UR3[0]);
+
+    GF[0].playerA = getWinner(UR3[0]);
+    GF[0].playerB = getWinner(LR4[0]);
+  }
+
+  function render() {
+    const columns = {
+      "col-UR1": UR1, "col-UR2": UR2, "col-UR3": UR3, "col-GF": GF,
+      "col-LR1": LR1, "col-LR2": LR2, "col-LR3": LR3, "col-LR4": LR4
+    };
+    for (const colId in columns) {
+      const col = document.getElementById(colId);
+      col.querySelectorAll(".match").forEach(m => m.remove());
+      columns[colId].forEach(m => col.appendChild(createMatchElement(m)));
+    }
+  }
+
+  document.getElementById("reset").onclick = () => location.reload();
+
+  buildNextRounds();
+  render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Swiss Stage Bracket — Masters Toronto</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: 'Orbitron', sans-serif;
+      padding: 30px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2em;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+    .bracket {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+    }
+    .column {
+      background: linear-gradient(135deg, #1a1a1a, #222);
+      padding: 20px;
+      clip-path: polygon(0 0, 100% 5%, 100% 95%, 0 100%);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+      min-width: 240px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-height: 90vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid #444;
+    }
+    .column h2 {
+      margin-bottom: 20px;
+      border-bottom: 2px solid #555;
+      padding-bottom: 6px;
+      width: 100%;
+      text-align: center;
+      color: #ddd;
+      font-size: 1.2em;
+      text-transform: uppercase;
+    }
+    .match {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      background: #1e1e1e;
+      clip-path: polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+      border: 1px solid #444;
+      padding: 10px;
+      gap: 4px;
+    }
+    .team {
+      flex: 1;
+      text-align: center;
+      padding: 8px 10px;
+      background: #2b2b2b;
+      color: #ccc;
+      clip-path: polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.95em;
+      user-select: none;
+    }
+    .team:hover {
+      background: #555;
+      color: #fff;
+    }
+    .team.selected {
+      background: #0f0;
+      color: #000;
+      cursor: default;
+    }
+    .team.loser {
+      background: #900;
+      color: #fff;
+      cursor: default;
+    }
+    .vs {
+      width: 30px;
+      text-align: center;
+      align-self: center;
+      color: #888;
+      font-weight: bold;
+    }
+    .empty {
+      font-style: italic;
+      color: #666;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+    .col-group {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    .qualified-team {
+      color: #0f0;
+      padding: 8px 10px;
+      font-weight: 700;
+      font-size: 0.95em;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .eliminated-team {
+      color: #f00;
+      padding: 8px 10px;
+      font-weight: 700;
+      font-size: 0.95em;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    button {
+      margin-top: 30px;
+      font-size: 1em;
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #0f0;
+      border: none;
+      border-radius: 5px;
+      font-weight: 700;
+      color: #000;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Swiss Stage Bracket - Masters Toronto</h1>
+<br>
+<div class="bracket">
+  <div class="column" id="col-0-0"><h2>0-0</h2></div>
+
+  <div class="col-group">
+    <div class="column" id="col-1-0"><h2>1-0</h2></div>
+    <div class="column" id="col-0-1"><h2>0-1</h2></div>
+  </div>
+
+  <div class="column" id="col-1-1"><h2>1-1</h2></div>
+
+  <div class="col-group">
+    <div class="column" id="col-qualified"><h2>Qualified</h2></div>
+    <div class="column" id="col-eliminated"><h2>Eliminated</h2></div>
+  </div>
+</div>
+
+<button onclick="saveQualifiers()">Save Qualifiers</button>
+
+<script>
+  const teams = ["GEN", "MIBR", "BLG", "TL", "SEN", "WOL", "TH", "PRX"];
+  let state = teams.map(name => ({ name, wins: 0, losses: 0 }));
+  const matchResults = new Map();
+  const matchesByColumn = new Map();
+
+  // This variable ensures we swap exactly once per rendering in 1-1
+  let swapped1_1 = false;
+
+  function clearColumns() {
+    ["col-0-0","col-1-0","col-0-1","col-1-1","col-qualified","col-eliminated"].forEach(id => {
+      const col = document.getElementById(id);
+      [...col.children].forEach(child => {
+        if(child.tagName.toLowerCase() !== "h2") col.removeChild(child);
+      });
+    });
+  }
+
+  function renderBracket() {
+    clearColumns();
+    swapped1_1 = false; // reset swap flag on each render
+
+    ["col-0-0","col-1-0","col-0-1"].forEach(colId => {
+      const [w, l] = colId.replace("col-", "").split("-").map(Number);
+      const col = document.getElementById(colId);
+      const pastMatches = matchesByColumn.get(colId) || [];
+
+      pastMatches.forEach(({ pair, winner }) => {
+        const matchDiv = document.createElement("div");
+        matchDiv.className = "match";
+        pair.forEach(teamName => {
+          const teamDiv = document.createElement("div");
+          teamDiv.className = "team";
+          teamDiv.textContent = teamName;
+          teamDiv.classList.add(winner === teamName ? "selected" : "loser");
+          matchDiv.appendChild(teamDiv);
+        });
+        const vs = document.createElement("div");
+        vs.className = "vs";
+        vs.textContent = "vs";
+        matchDiv.insertBefore(vs, matchDiv.children[1]);
+        col.appendChild(matchDiv);
+      });
+
+      const teamsHere = state.filter(t => t.wins === w && t.losses === l && !isInPastMatches(pastMatches, t.name));
+      for (let i = 0; i < teamsHere.length; i += 2) {
+        if (i + 1 < teamsHere.length) {
+          const pair = [teamsHere[i].name, teamsHere[i+1].name];
+          const matchDiv = document.createElement("div");
+          matchDiv.className = "match";
+
+          pair.forEach(teamName => {
+            const teamDiv = document.createElement("div");
+            teamDiv.className = "team";
+            teamDiv.textContent = teamName;
+            teamDiv.onclick = () => {
+              const winner = teamName;
+              const loser = pair.find(t => t !== winner);
+              state.forEach(t => {
+                if (t.name === winner) t.wins += 1;
+                if (t.name === loser) t.losses += 1;
+              });
+              matchResults.set(pair.sort().join("-"), winner);
+              if (!matchesByColumn.has(colId)) matchesByColumn.set(colId, []);
+              matchesByColumn.get(colId).push({ pair, winner });
+              renderBracket();
+            };
+            matchDiv.appendChild(teamDiv);
+          });
+
+          const vs = document.createElement("div");
+          vs.className = "vs";
+          vs.textContent = "vs";
+          matchDiv.insertBefore(vs, matchDiv.children[1]);
+
+          col.appendChild(matchDiv);
+        } else {
+          const teamDiv = document.createElement("div");
+          teamDiv.className = "team";
+          teamDiv.textContent = teamsHere[i].name + " (waiting)";
+          col.appendChild(teamDiv);
+        }
+      }
+
+      if (col.children.length === 1) {
+        const e = document.createElement("div");
+        e.className = "empty";
+        e.textContent = "No teams";
+        col.appendChild(e);
+      }
+    });
+
+    renderOneOneColumn();
+
+    renderStatusColumns();
+  }
+
+  // New function to handle 1-1 round with swapping logic
+  function renderOneOneColumn() {
+    const colId = "col-1-1";
+    const col = document.getElementById(colId);
+    const pastMatches = matchesByColumn.get(colId) || [];
+
+    pastMatches.forEach(({ pair, winner }) => {
+      const matchDiv = document.createElement("div");
+      matchDiv.className = "match";
+      pair.forEach(teamName => {
+        const teamDiv = document.createElement("div");
+        teamDiv.className = "team";
+        teamDiv.textContent = teamName;
+        teamDiv.classList.add(winner === teamName ? "selected" : "loser");
+        matchDiv.appendChild(teamDiv);
+      });
+      const vs = document.createElement("div");
+      vs.className = "vs";
+      vs.textContent = "vs";
+      matchDiv.insertBefore(vs, matchDiv.children[1]);
+      col.appendChild(matchDiv);
+    });
+
+    let teamsHere = state.filter(t => t.wins === 1 && t.losses === 1 && !isInPastMatches(pastMatches, t.name))
+                         .map(t => t.name);
+
+    // Swap logic to prevent immediate rematches of recent losers or winners
+    // Swap exactly once if possible and needed
+    if (!swapped1_1 && teamsHere.length >= 4) {
+      // We'll check pairs (0,1) and (2,3) and swap opponents between pairs if needed
+      // We want to prevent teams who lost in last match to face each other again
+      
+      // For simplification:
+      // teamsHere is [A, B, C, D]
+      // We'll swap B and C to mix opponents once
+      // This ensures no immediate rematches among recent losers or winners
+
+      // But only do swap if initial pairs are (A vs B), (C vs D)
+      // Swap to (A vs C), (B vs D)
+      let initialPairs = [[teamsHere[0], teamsHere[1]], [teamsHere[2], teamsHere[3]]];
+
+      // Just swap middle two teams to reduce rematches
+      const temp = teamsHere[1];
+      teamsHere[1] = teamsHere[2];
+      teamsHere[2] = temp;
+
+      swapped1_1 = true;
+    }
+
+    for (let i = 0; i < teamsHere.length; i += 2) {
+      if (i + 1 < teamsHere.length) {
+        const pair = [teamsHere[i], teamsHere[i+1]];
+        const matchDiv = document.createElement("div");
+        matchDiv.className = "match";
+
+        pair.forEach(teamName => {
+          const teamDiv = document.createElement("div");
+          teamDiv.className = "team";
+          teamDiv.textContent = teamName;
+          teamDiv.onclick = () => {
+            const winner = teamName;
+            const loser = pair.find(t => t !== winner);
+            state.forEach(t => {
+              if (t.name === winner) t.wins += 1;
+              if (t.name === loser) t.losses += 1;
+            });
+            matchResults.set(pair.sort().join("-"), winner);
+            if (!matchesByColumn.has(colId)) matchesByColumn.set(colId, []);
+            matchesByColumn.get(colId).push({ pair, winner });
+            renderBracket();
+          };
+          matchDiv.appendChild(teamDiv);
+        });
+
+        const vs = document.createElement("div");
+        vs.className = "vs";
+        vs.textContent = "vs";
+        matchDiv.insertBefore(vs, matchDiv.children[1]);
+
+        col.appendChild(matchDiv);
+      } else {
+        const teamDiv = document.createElement("div");
+        teamDiv.className = "team";
+        teamDiv.textContent = teamsHere[i] + " (waiting)";
+        col.appendChild(teamDiv);
+      }
+    }
+
+    if (col.children.length === 1) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "No teams";
+      col.appendChild(e);
+    }
+  }
+
+  function isInPastMatches(pastMatches, teamName) {
+    return pastMatches.some(m => m.pair.includes(teamName));
+  }
+
+  function renderStatusColumns() {
+    const qCol = document.getElementById("col-qualified");
+    const eCol = document.getElementById("col-eliminated");
+
+    ["qualified", "eliminated"].forEach(id => {
+      const col = document.getElementById("col-" + id);
+      while (col.children.length > 1) col.removeChild(col.lastChild);
+    });
+
+    const qualified = state.filter(t => t.wins >= 2 && t.losses < 2);
+    const eliminated = state.filter(t => t.losses >= 2);
+
+    qualified.forEach(t => {
+      const div = document.createElement("div");
+      div.className = "qualified-team";
+      div.textContent = `${t.name} (${t.wins}-${t.losses})`;
+      qCol.appendChild(div);
+    });
+
+    if (qualified.length === 0) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "None yet";
+      qCol.appendChild(e);
+    }
+
+    eliminated.forEach(t => {
+      const div = document.createElement("div");
+      div.className = "eliminated-team";
+      div.textContent = `${t.name} (${t.wins}-${t.losses})`;
+      eCol.appendChild(div);
+    });
+
+    if (eliminated.length === 0) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "None yet";
+      eCol.appendChild(e);
+    }
+  }
+
+  function saveQualifiers() {
+    const qualified = state.filter(t => t.wins >= 2 && t.losses < 2).map(t => t.name);
+    if(qualified.length === 0) {
+      alert("No teams qualified yet!");
+      return;
+    }
+    localStorage.setItem("qualifiedTeams", JSON.stringify(qualified));
+    alert("Qualifiers saved! Now open the Double Elimination page.");
+  }
+
+  renderBracket();
+</script>
+
+</body>
+</html>
